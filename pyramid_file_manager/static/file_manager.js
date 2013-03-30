@@ -126,7 +126,11 @@ var FileManager = (function(Backbone, Marionette) {
             , {
                 attribute: 'text_preview'
                 , method: function () {
-                    return this.model.get_text().substring(0, 140) + '…';
+                    var truncated = this.model.get_text().substring(0, 50);
+                    if(truncated.length < this.model.get_text().length) {
+                        return truncated + '…';
+                    }
+                    return truncated;
                 }
             }
         ]
@@ -275,7 +279,6 @@ var FileManager = (function(Backbone, Marionette) {
             var files = e.target.files;
             var that = this;
             _.each(files, function (file) { 
-                console.log('type', file.type);
                 var file_model = that.collection.create ({
                     name: file.name
                     , size: file.size
@@ -284,6 +287,7 @@ var FileManager = (function(Backbone, Marionette) {
                 });
                 that.global_progress.increment("finish", file.size);
 
+                console.log('type', file.type);
                 if(file_model.is_image()) {
                     console.log('its an image!');
                     loadImage(file, function (img) {
@@ -293,6 +297,15 @@ var FileManager = (function(Backbone, Marionette) {
                     }, {
                         noRevoke: true
                     });
+                } else {
+                    console.log('its text!');
+                    var fr = new FileReader();
+                    fr.onload = function (e) {
+                        console.log('data', e.target.result);
+                        file_model.set('data', e.target.result);
+                        that.files_view.render();
+                    };
+                    fr.readAsText(file);
                 }
 
             });
