@@ -1,3 +1,0 @@
-[submodule "pyramid_file_manager/static"]
-	path = pyramid_file_manager/static
-	url = https://github.com/pzatrick/marionette-file-uploader.git
