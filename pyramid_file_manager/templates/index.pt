@@ -19,25 +19,36 @@
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/bootstrap-transition.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/underscore.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.wreqr.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.syphon.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.marionette.js')}"></script>
+    <!-- <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.wreqr.js')}"></script> -->
+    <!-- <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.syphon.js')}"></script> -->
+    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.marionette.latest.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/hogan-3.0.0.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/crc32.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/file_manager.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/fixtures.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/alt_init/add_files.js')}"></script>
+    <!-- <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/jquery.fileupload.js')}"></script> -->
+    <script type="text/javascript">
+        var FileAPI = {
+            // @required
+            staticPath: '/static/lib/' // @default: './'
+        };
+    </script>
+    <script type='text/javascript' src="${request.static_url('pyramid_file_manager:static/lib/FileAPI.min.js')}"></script>
+    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/backbone.file-manager-app.js')}"></script>
+    <script type="text/Javascript">
+        FileManager.addInitializer(function(){
+            var controller = new FileManager.Controller();
+            controller.start();
+        });
+    </script>
   </head>
   <body>
       <noscript>Javascript must be enabled for the correct page display</noscript>
-      <div id="main" class="container">
+      <div id="main" class="container fileupload-widget-root">
           <!-- this is where all the dynamic markup magic happens -->
       </div>
       <script type="text/x-mustache" id="file-manager-template">
           <div class="fileupload-buttonbar clearfix">
               <div class="span7">
-                  <!-- The fileinput-button span is used to style the file input field as button -->
-                  <form>
+                  <form id='fileupload'>
                       <span class="btn btn-success fileinput-button">
                           <i class="icon-plus icon-white"></i>
                           <span>Add Files...</span>
@@ -57,34 +68,25 @@
                       <span>Delete All</span>
                   </button>
               </div>
-              <!-- The global progress information -->
               <div class="span5">
-                  <div id="global-progress">
-
-                  </div>
-                  <div id="progress-numbers" class="progress-extended">
+                  <div id="total-progress">
 
                   </div>
               </div>
           </div>
           <table role="presentation" class="table table-striped" id="files">
-
+            <!-- files view goes here -->
           </table>
       </script>
       <script type="text/x-mustache" id="file-template">      
-          {{#is_image}}
-          <td class="preview"><span><img src='{{data}}'></span></td>
-          {{/is_image}}
-          {{#is_text}}
-          <td class="preview"><span>{{text_preview}}</span></td>
-          {{/is_text}}
+          <td class="preview"></td>
           <td class="name"><span>{{name}}<span></td>
           <td class="size"><span>{{size}}</span></td>
           {{#error}}
           <td class="error" colspan="2"><span class="label label-important">Error</span>{{error}}</td>
           {{/error}} 
           {{^error}}
-          {{^is_uploaded}}
+          {{^uploaded}}
           <td class="progress-container span2">
           </td>
           <td class="start">
@@ -99,22 +101,22 @@
                   <span>Cancel</span>
               </button>
            </td>
-          {{/is_uploaded}}
-          {{#is_uploaded}}
+          {{/uploaded}}
+          {{#uploaded}}
           <td class="delete">
               <button type="button" class="btn btn-danger delete delete-file-button">
                   <i class="icon-trash icon-white"></i>
                   <span>Delete</span>
               </button>
           </td>
-          {{/is_uploaded}}
+          {{/uploaded}}
           {{/error}}
       </script>
       <script type="text/x-mustache" id="files-template">
       </script>
       <script type="text/x-mustache" id="progress-template">
           <div class="progress progress-success progress-striped active" role="progressbar" aria-valuemin="0" aria-valuemax="100">
-              <div class="bar" style="width:{{percent_finished}}%;"></div>
+              <div class="bar" style="width:{{percent}}%;"></div>
           </div>
       </script>
       <script type="text/x-mustache" id="progress-numbers-template">
