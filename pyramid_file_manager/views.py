@@ -152,6 +152,7 @@ class ImageUpload(Image):
                 result['delete_type'] = DELETEMETHOD
                 result['delete_url'] = self.request.route_url('upload',sep='',name='') + '/' + result['name']
                 result['url'] = self.request.route_url('view',name=result['name'])
+                print 'url', result['url']
                 if DELETEMETHOD != 'DELETE':
                     result['delete_url'] += '&_method=DELETE'
                 if (IMAGE_TYPES.match(result['type'])):
