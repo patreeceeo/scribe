@@ -6,6 +6,7 @@ def main(global_config, **settings):
     """
     config = Configurator(settings=settings)
     config.add_static_view('static', 'static', cache_max_age=3600)
+    config.add_static_view('images', 'images', cache_max_age=3600)
     config.add_route('index', '/')
     # upload processing
     # After replacing server/php/ in imageupload.pt with tal:attributes="action actionurl"
