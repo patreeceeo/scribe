@@ -375,6 +375,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
             fileprogress: function (evt) {
                 // progress file uploading
                 var filePercent = evt.loaded/evt.total*100;
+                console.log('fileprogress');
                 FileManager.get_file_progress(current_file).set('percent', filePercent);
             },
             filecomplete: function (err, xhr) {

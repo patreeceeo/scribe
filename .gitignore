@@ -1,3 +1,4 @@
 *.pyc
 *.sw*
-*.egg-info
+*.egg-info*
+pyramid_file_manager/images/*
