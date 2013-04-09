@@ -128,7 +128,7 @@ class ImageUpload(Image):
         from pprint import pprint
         # import pdb; pdb.set_trace()
 
-        print 'here'
+        print 'post'
         from time import sleep
         sleep(1)
         if self.request.matchdict.get('_method') == "DELETE":
