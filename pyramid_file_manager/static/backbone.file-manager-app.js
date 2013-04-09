@@ -232,6 +232,9 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
                 model: options.total_progress
             });
             console.log('total progress',this.total_progress_view.cid, options.total_progress.cid);
+
+            this.listenTo(FileManager, "upload_complete", this.upload_completed);
+
             Marionette.Layout.prototype.initialize.call(this, options);
         }
         , regions: {
@@ -240,44 +243,40 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
         }
         , onRender: function () {
             this.files_region.show(this.files_view);
+            this.total_progress_region.show(this.total_progress_view);
+            if(_.keys(FileManager.local_files).length == 0) {
+                this.total_progress_region.$el.hide();
+            }
         }
-        // , serializeData: function () {
-        //     return { 
-        //         uploading: _.keys(FileManager.local_files).length > 0
-        //     }
-        // }
         , events: {
             'change #file-input': 'files_added'
             , 'click #start-button': 'start_upload'
             , 'click #cancel-button': 'cancel_upload'
             , 'click #delete-button': 'delete_files'
+            , "upload_complete": "upload_completed"
         }
         , files_added: function (e) {
             _.each(e.target.files, FileManager.add_file);
 
             if(_.keys(FileManager.local_files).length > 0) {
-                this.total_progress_region.show(this.total_progress_view);
+                this.total_progress_region.$el.show();
             }
             // clear the files from the file input so they don't accumulate
             $('form')[0].reset();
         }
         , start_upload: function () {
-            this.promise = FileManager.upload_files(FileManager.local_files);
-            var that = this;
-            this.promise.then(function () {
-                if(_.keys(FileManager.local_files).length == 0) {
-                    console.log('hiding total progress');
-                    that.total_progress_view.close();
-                }
-            });
+            FileManager.upload_files(FileManager.local_files);
         }
         , cancel_upload: function () {
-            // this.promise.abort();
+            FileManager.cancel_upload();
         }
         , delete_files: function () {
             if(window.confirm('Are you really really sure you want to delete ALL the files?')) {
                 // TODO
             }
+        }
+        , upload_completed: function () {
+            this.total_progress_region.$el.hide();
         }
     });
 
@@ -343,7 +342,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
     
     FileManager.upload_files = function (files) {
         var current_file, dfd = new $.Deferred();
-        FileAPI.upload({
+        var xhr = FileAPI.upload({
             url: 'server/php/',
             // data: { foo: 'bar' },
             // headers: { 'x-header': '...' },
@@ -389,11 +388,15 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
                 if( !err ){
                     // Congratulations, the uploading was successful!
                     // console.log('success!');
-                    FileManager.set_upload_timeout(dfd.resolve);
+                    FileManager.set_upload_timeout(function () {
+                        FileManager.trigger("upload_complete");
+                        FileManager.total_progress.set('percent', 0);
+                    });
                 }
             }
         });
-        return dfd.promise();
+        // return dfd.promise();
+        return FileManager;
     }
 
     FileManager.on('initialize:after', function(){
