@@ -45,6 +45,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
         template: '#file-template'
         , tagName: 'tr'
         , initialize: function () {
+            console.log('new file view');
             this.progress_view = new FileManager.ProgressView({
                 model: g_a_file_progress = FileManager.get_file_progress(this.model.id)
             });
@@ -63,10 +64,10 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
             , 'click .delete-file-button': 'delete_file'
         }
         , start_upload: function () {
-            this.xhr = FileManager.upload_files([FileManager.get_local_file(this.model.id)]);
+            FileManager.upload_files([FileManager.get_local_file(this.model.id)]);
         }
         , cancel_upload: function () {
-            this.xhr.abort();
+            FileManager.cancel_upload(this.model.id);
         }
         , delete_file: function () {
             if(window.confirm('Are you really really sure you want to delete '+this.model.get('name')+'?')) {
@@ -190,6 +191,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
 
     FileManager.File = Backbone.Model.extend({
         url: '/' // TODO
+        , idAttribute: "name"
         , save: function () {}
         , defaults: {
             // TODO
@@ -295,8 +297,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
             , percent: 0
         });
         FileManager.file_models.create({
-            id: file.name
-            , name: file.name
+            name: file.name
             , size: file.size
             , type: file.type
             , lastModifiedDate: file.lastModified
@@ -314,8 +315,12 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
 
     };
 
-    FileManager.get_local_file = function (filename) {
-        return FileManager.local_files[filename];
+    FileManager.get_local_file = function (file) {
+        if(typeof file == 'string')
+            // assume its the name of the file
+            return FileManager.local_files[file];
+        else
+            return file
     }
 
     FileManager.get_file_name = function(file) {
@@ -341,8 +346,8 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
     }
     
     FileManager.upload_files = function (files) {
-        var current_file, dfd = new $.Deferred();
-        var xhr = FileAPI.upload({
+        var current_file, dfd = new $.Deferred(), xhr;
+        xhr = FileManager.xhr = FileAPI.upload({
             url: 'server/php/',
             // data: { foo: 'bar' },
             // headers: { 'x-header': '...' },
@@ -376,6 +381,10 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
                 if( !err ) {
                     FileManager.get_file_model(current_file.name).set('uploaded', true);
                     delete FileManager.local_files[current_file.name];
+
+                    var responses = $.parseJSON(xhr.responseText);
+                    console.log('responses', responses);
+                    FileManager.file_models.add(responses, {merge: true});
                 }
             },
             progress: function (evt) {
@@ -385,7 +394,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
                 FileManager.total_progress.set('percent', totalPercent);
             },
             complete: function (err, xhr) {
-                if( !err ){
+                if( !err ) {
                     // Congratulations, the uploading was successful!
                     // console.log('success!');
                     FileManager.set_upload_timeout(function () {
@@ -395,8 +404,17 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
                 }
             }
         });
-        // return dfd.promise();
+        console.log('xhr',xhr);
         return FileManager;
+    }
+
+    FileManager.cancel_upload = function (file) {
+        file = FileManager.get_local_file(file);
+        FileManager.xhr.abort(file);
+        FileManager.total_progress.set('percent', 0);
+        FileManager.file_progress.each(function (progress) {
+            progress.set('percent', 0);
+        });
     }
 
     FileManager.on('initialize:after', function(){

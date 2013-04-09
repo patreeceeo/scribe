@@ -129,11 +129,12 @@ class ImageUpload(Image):
         # import pdb; pdb.set_trace()
 
         print 'here'
+        from time import sleep
+        sleep(1)
         if self.request.matchdict.get('_method') == "DELETE":
             return self.delete()
         results = []
         for name, fieldStorage in self.request.POST.items():
-            print 'name',name
             pprint (fieldStorage)
             if isinstance(fieldStorage,unicode):
                 continue
@@ -159,6 +160,7 @@ class ImageUpload(Image):
                     except: # Could not get an image serving url
                         pass
             results.append(result)
+        pprint(results)
         return results
 
 

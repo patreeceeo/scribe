@@ -103,6 +103,9 @@
            </td>
           {{/uploaded}}
           {{#uploaded}}
+          <td class="url">
+              {{url}}
+          </td>
           <td class="delete">
               <button type="button" class="btn btn-danger delete delete-file-button">
                   <i class="icon-trash icon-white"></i>
