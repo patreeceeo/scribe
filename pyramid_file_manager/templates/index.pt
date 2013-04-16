@@ -30,6 +30,8 @@
             // @required
             staticPath: '/static/lib/' // @default: './'
         };
+        
+        var baseURL = '${request.route_url("index")}';
     </script>
     <script type='text/javascript' src="${request.static_url('pyramid_file_manager:static/lib/FileAPI.min.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/backbone.file-manager-app.js')}"></script>

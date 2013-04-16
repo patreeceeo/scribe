@@ -348,7 +348,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
     FileManager.upload_files = function (files) {
         var current_file, dfd = new $.Deferred(), xhr;
         xhr = FileManager.xhr = FileAPI.upload({
-            url: 'server/php/',
+            url: baseURL+'server/php/',
             // data: { foo: 'bar' },
             // headers: { 'x-header': '...' },
             files: files,
