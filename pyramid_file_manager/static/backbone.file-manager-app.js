@@ -352,7 +352,7 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
             // data: { foo: 'bar' },
             // headers: { 'x-header': '...' },
             files: files,
-            chunkSize: 0, // or chunk size in bytes, eg: FileAPI.MB*.5 (html5)
+            chunkSize: 2000, // or chunk size in bytes, eg: FileAPI.MB*.5 (html5)
             chunkUploadRetry: 0, // number of retries during upload chunks (html5)
 
             // imageTransform: {

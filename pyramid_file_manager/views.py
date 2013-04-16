@@ -27,11 +27,14 @@ class Image:
         p = IMAGEPATH + [ name ]
         return os.path.join('pyramid_file_manager', *p) 
 
+import io
+total_file_contents = ""
 @view_defaults(route_name='upload')
 class ImageUpload(Image):
 
     def __init__(self,request):
         self.request = request
+        print '__init__'
         request.response.headers['Access-Control-Allow-Origin'] = '*'
         request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, HEAD, GET, POST, PUT, DELETE'
 
@@ -122,20 +125,50 @@ class ImageUpload(Image):
         except IOError:
             return False
         return True
-    
+
+    def get_content_range(self):
+        ints = re.findall('([0-9]+)', self.request.headers['Content-Range']) 
+        return range(int(ints[0]), int(ints[1]))
+
+    def get_content_length(self):
+        ints = re.findall('([0-9]+)', self.request.headers['Content-Length']) 
+        return int(ints[0])
+
+
+    def get_filename(self):
+        return re.findall('(?<=filename=)["\']?([\w\.\-]+)["\']?', self.request.headers['Content-Disposition'])[0] 
+
+    def get_file_type(self):
+        return self.request.headers['Content-Type']
+
+
     @view_config(request_method='POST', xhr=True, accept="application/json", renderer='json')
     def post(self):
         from pprint import pprint
-        # import pdb; pdb.set_trace()
 
-        print 'post'
-        # from time import sleep
-        # sleep(1)
         if self.request.matchdict.get('_method') == "DELETE":
             return self.delete()
+
+        # If this is a chunked upload there will be no POST/form variables, 
+        # but just the current chunk of the file being uploaded.
+        if not self.request.POST:
+            filename = self.get_filename()
+            start = min(self.get_content_range())
+            with open(self.imagepath(filename), 'a+b') as f:
+                f.seek(start)
+                shutil.copyfileobj(self.request.body_file, f)
+     
+            with open( self.imagepath(filename + '.type'), 'w') as f:
+                f.write(self.get_file_type())
+
+            return [{
+                'name': filename,
+                'url': self.request.route_url('view',name=filename)
+            }]
+
+      
         results = []
         for name, fieldStorage in self.request.POST.items():
-            pprint (fieldStorage)
             if isinstance(fieldStorage,unicode):
                 continue
             result = {}
