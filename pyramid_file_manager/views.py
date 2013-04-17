@@ -17,15 +17,12 @@ IMAGE_TYPES = re.compile('image/(gif|p?jpeg|(x-)?png)')
 ACCEPT_FILE_TYPES = IMAGE_TYPES
 THUMBNAIL_SIZE = 80
 EXPIRATION_TIME = 300 # seconds
-IMAGEPATH = [ 'images' ]
-THUMBNAILPATH = [ 'images', 'thumbnails' ]
 # change the following to POST if DELETE isn't supported by the webserver
 DELETEMETHOD='DELETE'
 
 class Image:
-    def imagepath(self,name):
-        p = IMAGEPATH + [ name ]
-        return os.path.join('pyramid_file_manager', *p) 
+    def imagepath(self, name):
+        return os.path.join(self.request.registry.settings['scribe.users_path'], name)
 
 import io
 total_file_contents = ""
@@ -59,8 +56,7 @@ class ImageUpload(Image):
         return self.request.route_url('view',name='thumbnails') + '/' + name
 
     def thumbnailpath(self,name):
-        p = THUMBNAILPATH + [ name ]
-        return os.path.join('pyramid_file_manager', *p)
+        return os.path.join(request.registry.settings['scribe.users_path'], 'thumbnails', name)
 
     def createthumbnail(self,filename):
         from PIL import Image
