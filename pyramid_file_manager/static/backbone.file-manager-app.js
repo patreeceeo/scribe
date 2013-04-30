@@ -155,10 +155,10 @@ function FileManagerFactory (Backbone, Marionette, FileAPI, underscore, serverUR
             model = model || this.model;
             preview = preview || model.get('preview');
             if(preview) {
-                this.$el.find('.preview').html(preview);
+                this.$('.preview').html(preview);
             } 
             else {
-                this.$el.find('.preview').html(
+                this.$('.preview').html(
                     '<img src="'+model.get('url')+'" />'
                 );
             }
