@@ -1,211 +1,229 @@
-var g_total_progress;
-var g_a_file_progress;
+// baseURL is defined by the server in a server-side 
+// template file
+var serverURLs = {
+    base: baseURL
+    , api: baseURL + 'server/php/'
+}
 
-var FileManager = (function(Backbone, Marionette, $, FileAPI) {
-    'use strict';
+var g_realFiles;
 
-    // This is the primary Marionette application that will control all of
-    // our regions on the site
-    var FileManager = new Backbone.Marionette.Application();
+// most href clicks should trigger backbone routing
+$(document).on('click', 'a:not([data-bypass])', function(evt) {
+    "use strict";
 
-    FileManager.route_root = '/';
-
-    // most href clicks should trigger backbone routing
-    $(document).on('click', 'a:not([data-bypass])', function(evt) {
-        var href, root;
-        href = {
-            prop: $(this).prop('href')
-            , attr: $(this).attr('href')
-        };
-
-        root = location.protocol + '//' + location.host + FileManager.route_root;
-
-        if (href.prop && href.prop.slice(0, root.length) === root) {
-            evt.preventDefault();
-
-            return Backbone.history.navigate(href.attr, {
-                trigger: true
-            });
-        }
-    });
-
-    // We're templating with hogan
-    Marionette.TemplateCache.prototype.compileTemplate = function (raw) {
-        var compiled = Hogan.compile(raw);
-        return function (data) {
-            return compiled.render(data);
-        };
+    var href, root;
+    href = {
+        prop: $(this).prop('href')
+        , attr: $(this).attr('href')
     };
 
-    FileManager.addRegions({
-        main_region: '#main'
-    });
+    root = location.protocol + '//' + location.host + serverURLs.base;
 
-    FileManager.FileView = Marionette.Layout.extend({
-        template: '#file-template'
-        , tagName: 'tr'
-        , initialize: function () {
-            console.log('new file view');
-            this.progress_view = new FileManager.ProgressView({
-                model: g_a_file_progress = FileManager.get_file_progress(this.model.id)
-            });
-            Marionette.Layout.prototype.initialize.apply(this, arguments);
+    if (href.prop && href.prop.slice(0, root.length) === root) {
+        evt.preventDefault();
+
+        return Backbone.history.navigate(href.attr, {
+            trigger: true
+        });
+    }
+});
+
+var pixelsPer = {};
+$(document).ready(function onLoad () {
+    $('body').append('<div id="emwide" style="width:1em"></div>');
+
+    pixelsPer.em = $('#emwide').width();
+});
+    
+
+// We're templating with hogan
+Marionette.TemplateCache.prototype.compileTemplate = function (raw) {
+    "use strict";
+
+    var compiled = Hogan.compile(raw);
+    return function (data) {
+        return compiled.render(data);
+    };
+};
+
+var FileManager = FileManagerFactory(Backbone, Marionette, FileAPI, _, serverURLs, pixelsPer);
+
+function FileManagerFactory (Backbone, Marionette, FileAPI, underscore, serverURLs, pixelsPer) {
+    'use strict';
+
+    var $ = Marionette.$ || Backbone.$;
+    var _ = underscore;
+  
+    var __slice = Array.prototype.slice;
+
+    // a decorator that ensures the a function is called with a
+    // certain context and arguments
+    function callWith (context, fnName, args) {
+        return function innerCallWith () {
+            context[fnName].call(context, args);
         }
-        , regions: {
-            progress_region: '.progress-container'
+    };
+
+    function sliceArgs(fn, start, end) {
+        return function innerSliceArgs () {
+            var args = __slice.call(arguments, start, end);
+            fn.apply(this, args);
         }
-        , onRender: function () {
-            this.progress_region.show(this.progress_view);
-            this.insert_preview();
+    };
+
+    function withMyFiles (fn) {
+        return function innerWithMyFiles () {
+            var models = []
+                , ids = []
+                , files = [];
+            if(this.model) {
+                models = [this.model];
+                ids = [this.model.id];
+            }
+            if(this.collection) {
+                models = models.concat(this.collection.models);
+                ids = ids.concat(this.collection.pluck("name"));
+            }
+            files = _.map(ids, getRealFile);
+            return fn.call(this, files, models);
         }
-        , events: {
-            'click .cancel-file-button': 'cancel_upload'
-            , 'click .start-file-button': 'start_upload'
-            , 'click .delete-file-button': 'delete_file'
+    };
+
+    function bound(ctx, fn) {
+        return function () {
+            fn.apply(ctx, arguments)
         }
-        , start_upload: function () {
-            FileManager.upload_files([FileManager.get_local_file(this.model.id)]);
+    }
+
+    function delayedBy(milisecs, fn) {
+        return function innerDelayed () {
+            var that = this;
+            var bfn = function () { 
+                fn.call(that, arguments);
+            }
+            window.setTimeout(bfn, milisecs)
         }
-        , cancel_upload: function () {
-            FileManager.cancel_upload(this.model.id);
-        }
-        , delete_file: function () {
-            if(window.confirm('Are you really really sure you want to delete '+this.model.get('name')+'?')) {
-                // TODO
+    }
+
+    function withErrorCheck (fn) {
+        return function innerWithErrorCheck (err) {
+            if (!err) {
+                fn.apply(this, __slice.call(arguments, 1))
             }
         }
+    }
+
+    function withAttr (fn) {
+        return function bindAttrName (attrname) {
+            return function withAttrFinal () {
+                return fn(this.get(attrname));
+            }
+        }
+    }
+
+    var Layout = Marionette.Layout;
+
+    var FileView = Layout.extend({
+        template: '#file-template'
+        , tagName: 'tr'
+        , initialize: function FileViewInit () {
+            Layout.prototype.initialize.call(this);
+            this.progressView = new ProgressView({
+                model: fileProgresses.get(this.model.id)
+            });
+        }
+        , regions: {
+            progressRegion: '.progress-container'
+        }
+        , onRender: function FileViewOnRender () {
+            this.progressRegion.show(this.progressView);
+            this.insertPreview();
+        }
+        , events: {
+            'click .cancel-file-button': 'cancelUpload'
+            , 'click .start-file-button': 'uploadFile'
+            , 'click .delete-file-button': 'deleteFile'
+        }
+        , uploadFile: withMyFiles(UploadFiles)
+        , cancelUpload: withMyFiles(CancelUpload)
+        , deleteFile: withMyFiles(DeleteWithConfirmation)
         , modelEvents: {
             "change:uploaded": "uploaded"
-            , "change:preview": "insert_preview"
+            , "change:preview": "insertPreview"
         }
-        , insert_preview: function (model, preview) {
+        , insertPreview: function insertPreview (model, preview) {
             model = model || this.model;
             preview = preview || model.get('preview');
-            $(this.el).find('.preview').html(preview);
+            if(preview) {
+                this.$el.find('.preview').html(preview);
+            } 
+            else {
+                this.$el.find('.preview').html(
+                    '<img src="'+model.get('url')+'" />'
+                );
+            }
         }
-        , uploaded: function () {
-            var that = this;
-            // wait for CSS width transition of progress bar to finish
-            FileManager.set_upload_timeout(that.render);
-        }
+        , uploaded: delayedBy(600, function () {
+            this.render();
+        })
     });
 
 
-    FileManager.FilesView = Marionette.CompositeView.extend({
-        itemView: FileManager.FileView
+    var FilesView = Marionette.CompositeView.extend({
+        itemView: FileView
         , tagName: 'tbody'
-        , loadingView: FileManager.LoadingView
-        , emptyView: FileManager.EmptyView
+        // , loadingView: LoadingView
+        // , emptyView: EmptyView
         , template: '#files-template'
+        , uploadFiles: withMyFiles(UploadFiles)
+        , cancelUpload: withMyFiles(CancelUpload)
+        , deleteFiles: withMyFiles(DeleteWithConfirmation)
     });
 
-
-    FileManager.ProgressView = Marionette.ItemView.extend({
+    var ProgressView = Marionette.ItemView.extend({
         className: 'fileupload-progress'
         , template: '#progress-template'
         , ui: {
             bar: '.bar'
         }
         , modelEvents: {
-            'change:percent': 'percent_changed'
+            'change:percent': 'adjust_bar_width'
         }
-        , percent_changed: function (percent) {
-            console.log(this.cid,this.model.cid,'percent changed');
-            this.adjust_bar_width(percent);
-        }
-        , adjust_bar_width: function (model, percent) {
+        , adjust_bar_width: function adjustBarWidth (model, percent) {
             model = model || this.model;
             percent = percent || model.get('percent');
             this.$('.bar').width(percent+'%');
         }
     });
 
-    var Format = {
-        rate: function (bps) {
-            if (typeof bps !== 'number') {
-                return '';
-            }
-            if (bps >= 1000000000) {
-                return (bps / 1000000000).toFixed(2) + ' Gbit/s';
-            }
-            if (bps >= 1000000) {
-                return (bps / 1000000).toFixed(2) + ' Mbit/s';
-            }
-            if (bps >= 1000) {
-                return (bps / 1000).toFixed(2) + ' Kbit/s';
-            }
-            return bps.toFixed(2) + ' bit/s';
-        }
-        , time: function (seconds) {
-            var date = new Date(seconds * 1000),
-                days = parseInt(seconds / 86400, 10);
-            days = days ? days + 'd ' : '';
-            return days +
-                ('0' + date.getUTCHours()).slice(-2) + ':' +
-                ('0' + date.getUTCMinutes()).slice(-2) + ':' +
-                ('0' + date.getUTCSeconds()).slice(-2);
-        }
-        , size: function (bytes) {
-            if (typeof bytes !== 'number') {
-                return '';
-            }
-            if (bytes >= 1000000000) {
-                return (bytes / 1000000000).toFixed(2) + ' GB';
-            }
-            if (bytes >= 1000000) {
-                return (bytes / 1000000).toFixed(2) + ' MB';
-            }
-            return (bytes / 1000).toFixed(2) + ' KB';
-        }
-    };
-
-    FileManager.ProgressNumbersView = Marionette.ItemView.extend({
-        template: '#progress-numbers-template'
-        , modelEvents: {
-            'change:rabbit': 'render'
-        }
-        , serializeData: function () {
-            var start = this.model.get('start') || 1;
-            var finish = this.model.get('finish') || 1;
-            var rabbit = this.model.get('rabbit') || 1;
-            var rate = 100;
-            var data = {
-                rate: Format.rate(rate)
-                , time: Format.time((finish - rabbit) * 8 / rate)
-                , percent_finished: (rabbit / finish * 100).toFixed(2)
-                , amount_finished: Format.size(rabbit)
-                , finish: Format.size(finish)
-            };
-            return data;
-        }
-    });
-        
-    FileManager.Model = Backbone.Model.extend({
-        increment: function (attr, value) {
+    var Model = Backbone.Model.extend({
+        increment: function increment (attr, value) {
             this.set(attr, this.get(attr) + value)
         }
     });
 
-    FileManager.Collection = Backbone.Collection.extend({
-    });
+    var Collection = Backbone.Collection;
 
-    FileManager.File = Backbone.Model.extend({
-        url: '/' // TODO
+    var File = Model.extend({
+        url: serverURLs.api
         , idAttribute: "name"
         , save: function () {}
         , defaults: {
             // TODO
             // preview: 'defaultpreviewblob'
         }
+        , deleteRemote: withAttr(DeleteRemoteFile)("name")
     });
 
-    FileManager.Files = FileManager.Collection.extend({
+
+    var Files = Collection.extend({
         url: '/' // TODO
         , save: function () {}
-        , model: FileManager.File
+        , model: File
     });
 
-    FileManager.Progress = FileManager.Model.extend({
+
+    var Progress = Model.extend({
         url: '/' // TODO
         , save: function () {}
         , defaults: {
@@ -214,230 +232,236 @@ var FileManager = (function(Backbone, Marionette, $, FileAPI) {
         }
     });
 
-
-    FileManager.Progresses = FileManager.Collection.extend({
+    var Progresses = Collection.extend({
         url: '/' // TODO
         , save: function () {}
-        , model: FileManager.Progress
+        , model: Progress
     });
-    
 
-    FileManager.Layout = Marionette.Layout.extend({
+
+    var AppLayout = Layout.extend({
         template: '#file-manager-template'
         , className: 'row'
-        , initialize: function (options) {
-            this.files_view = new options.files_view_class({
-                collection: options.file_models
+        , initialize: function AppLayoutInit (options) {
+            Layout.prototype.initialize.call(this, options);
+            this.filesView = new FilesView({
+                collection: fileModels
             });
-            g_total_progress = options.total_progress;
-            this.total_progress_view = new options.progress_view_class({
-                model: options.total_progress
-            });
-            console.log('total progress',this.total_progress_view.cid, options.total_progress.cid);
 
-            this.listenTo(FileManager, "upload_complete", this.upload_completed);
-
-            Marionette.Layout.prototype.initialize.call(this, options);
         }
         , regions: {
-            files_region: '#files'
-            , total_progress_region: '#total-progress'
+            filesRegion: '#files'
+            , totalProgressRegion: '#total-progress'
         }
-        , onRender: function () {
-            this.files_region.show(this.files_view);
-            this.total_progress_region.show(this.total_progress_view);
-            if(_.keys(FileManager.local_files).length == 0) {
-                this.total_progress_region.$el.hide();
-            }
+        , onRender: function AppLayoutOnRender () {
+            this.filesRegion.show(this.filesView);
+            this.totalProgressRegion.show(totalProgressView);
+            // if(_.keys(FileManager.localFiles).length == 0) {
+            //     this.totalProgressRegion.$el.hide();
+            // }
         }
         , events: {
-            'change #file-input': 'files_added'
-            , 'click #start-button': 'start_upload'
-            , 'click #cancel-button': 'cancel_upload'
-            , 'click #delete-button': 'delete_files'
-            , "upload_complete": "upload_completed"
+            'change #file-input': 'filesAdded'
+            , 'click #start-button': 'uploadFiles'
+            , 'click #cancel-button': 'cancelUpload'
+            , 'click #delete-button': 'deleteFiles'
         }
-        , files_added: function (e) {
-            _.each(e.target.files, FileManager.add_file);
+        , filesAdded: function AppLayoutFilesAdded (e) {
+            _.each(e.target.files, addRealFile);
+            eventStream.trigger("filesAdded");
 
-            if(_.keys(FileManager.local_files).length > 0) {
-                this.total_progress_region.$el.show();
-            }
+            // if(_.keys(FileManager.local_files).length > 0) {
+            //     this.total_progress_region.$el.show();
+            // }
             // clear the files from the file input so they don't accumulate
             $('form')[0].reset();
         }
-        , start_upload: function () {
-            FileManager.upload_files(FileManager.local_files);
+        , uploadFiles: function () {
+            this.filesView.uploadFiles();
         }
-        , cancel_upload: function () {
-            FileManager.cancel_upload();
+        , cancelUpload: function () {
+            this.filesView.cancelUpload();
         }
-        , delete_files: function () {
-            if(window.confirm('Are you really really sure you want to delete ALL the files?')) {
-                // TODO
-            }
-        }
-        , upload_completed: function () {
-            this.total_progress_region.$el.hide();
+        , deleteFiles: function () {
+            this.filesView.deleteFiles();
         }
     });
 
+    var fileModels = new Files();
+    var fileProgresses = new Progresses();
+    var totalProgress = new Progress();
+    var totalProgressView = new ProgressView({
+        model: totalProgress
+    });
+    var realFiles = g_realFiles = [];
 
-    FileManager.file_models = new FileManager.Files();
-    FileManager.file_progress = new FileManager.Progresses();
-    FileManager.file_preview = {};
-    FileManager.total_progress = new FileManager.Progress();
+    function getRealFile (filename) {
+        return _.find(realFiles, function hasFileName (file) {
+            return file.name == filename;
+        });
+    }
 
-    FileManager.local_files = {};
-    FileManager.add_file = function (file) {
-        FileManager.local_files[file.name] = file;
-        FileManager.file_progress.create({
+    function addRealFile (file) {
+        realFiles.push(file);
+        fileProgresses.create({
             id: file.name
             , size: file.size
             , percent: 0
         });
-        FileManager.file_models.create({
+        var model = fileModels.create({
             name: file.name
             , size: file.size
             , type: file.type
             , lastModifiedDate: file.lastModified
         });
 
-        FileManager.total_progress.increment('size', file.size);
+        // totalProgress.increment('size', file.size);
 
         if(/image/.test(file.type)) {
-            FileAPI.Image(file).resize(100, 100, "max").get(function (err, image) {
-                if(!err) {
-                    FileManager.file_models.get(file.name).set('preview', image);
-                }
-            });
+            FileAPI.Image(file)
+            .resize(15*pixelsPer.em, 20*pixelsPer.em, "max")
+            .get(withErrorCheck(function (image) {
+                model.set('preview', image);
+            }));
         }
-
     };
 
-    FileManager.get_local_file = function (file) {
-        if(typeof file == 'string')
-            // assume its the name of the file
-            return FileManager.local_files[file];
-        else
-            return file
-    }
+    var uploadXHR = null;
 
-    FileManager.get_file_name = function(file) {
-        if(typeof file == 'string') // assume we were given a file name
-            return file;
-        else // hopefully its an object with a name property
-            return file.name
-    }
+    function UploadFiles (realFiles) {
+        var currentFile;
 
-    FileManager.get_file_model = function(file) {
-        return this.file_models.get(FileManager.get_file_name(file));
-    }
-
-    FileManager.get_file_progress = function (file) {
-        return this.file_progress.get(FileManager.get_file_name(file));
-    }
-
-    // There is a short CSS transition that for aesthetics we 
-    // want to wait to complete before acknowledging that
-    // the upload is complete
-    FileManager.set_upload_timeout = function (callback) {
-        return window.setTimeout(callback, 600);
-    }
-    
-    FileManager.upload_files = function (files) {
-        var current_file, dfd = new $.Deferred(), xhr;
-        xhr = FileManager.xhr = FileAPI.upload({
-            url: baseURL+'server/php/',
-            // data: { foo: 'bar' },
-            // headers: { 'x-header': '...' },
-            files: files,
-            chunkSize: 2000, // or chunk size in bytes, eg: FileAPI.MB*.5 (html5)
-            chunkUploadRetry: 0, // number of retries during upload chunks (html5)
-
-            // imageTransform: {
-            //     maxWidth: 1024,
-            //     maxHeight: 768
-            // },
-            // imageAutoOrientation: true,
-            prepare: function (file, options) {
-                // prepare options for current file
-                // TODO find a better way to know what the current file is
-                current_file = file;
-            },
-            upload: function (xhr, options) {
-                // start uploading
-            },
-            fileupload: function (xhr, options) {
-                // start file uploading
-                // console.log('fileupload',xhr, options);
-            },
-            fileprogress: function (evt) {
-                // progress file uploading
-                var filePercent = evt.loaded/evt.total*100;
-                console.log('fileprogress');
-                FileManager.get_file_progress(current_file).set('percent', filePercent);
-            },
-            filecomplete: function (err, xhr) {
-                if( !err ) {
-                    FileManager.get_file_model(current_file.name).set('uploaded', true);
-                    delete FileManager.local_files[current_file.name];
-
-                    var responses = $.parseJSON(xhr.responseText);
-                    console.log('responses', responses);
-                    FileManager.file_models.add(responses, {merge: true});
-                }
-            },
-            progress: function (evt) {
-                // total progress uploading
-                var totalPercent = evt.loaded/evt.total*100;
-                console.log('total progress',FileManager.total_progress.cid);
-                FileManager.total_progress.set('percent', totalPercent);
-            },
-            complete: function (err, xhr) {
-                if( !err ) {
-                    // Congratulations, the uploading was successful!
-                    // console.log('success!');
-                    FileManager.set_upload_timeout(function () {
-                        FileManager.trigger("upload_complete");
-                        FileManager.total_progress.set('percent', 0);
-                    });
-                }
-            }
-        });
-        console.log('xhr',xhr);
-        return FileManager;
-    }
-
-    FileManager.cancel_upload = function (file) {
-        file = FileManager.get_local_file(file);
-        FileManager.xhr.abort(file);
-        FileManager.total_progress.set('percent', 0);
-        FileManager.file_progress.each(function (progress) {
-            progress.set('percent', 0);
-        });
-    }
-
-    FileManager.on('initialize:after', function(){
-          Backbone.history.start();
-    });
-
-    FileManager.Controller = function(){};
-
-    _.extend(FileManager.Controller.prototype, {
-        // Start the app by showing the appropriate views
-        // and fetching the list of todo items, if there are any
-        start: function() {
-            var layout = new FileManager.Layout({
-                file_models: FileManager.file_models
-                , files_view_class: FileManager.FilesView
-                , total_progress: FileManager.total_progress
-                , file_progress: FileManager.file_progress
-                , progress_view_class: FileManager.ProgressView
-            });
-            FileManager.main_region.show(layout);
+        function progressEventHandler (progressModel, evt) {
+            progressModel.set("percent", evt.loaded/evt.total*100);
         }
+
+        function prepare (file) {
+            currentFile = file;
+        }
+
+        function filecomplete (xhr) {
+            fileModels.get(currentFile.name).set('uploaded', true);
+            var responses = $.parseJSON(xhr.responseText);
+            console.log('responses', responses);
+            fileModels.add(responses, {merge: true});
+        }
+
+        function complete () {
+            eventStream.trigger("uploadComplete");
+        };
+
+        function getFilesObject () {
+            var obj = {}
+            _.each(realFiles, function (file) {
+                if(file && !fileModels.get(file.name).get('uploaded')) {
+                    obj[file.name] = file;
+                }
+            });
+            return obj;
+        };
+
+        console.log('files obj',getFilesObject());
+
+        uploadXHR = FileAPI.upload({
+            url: serverURLs.api
+            , files: getFilesObject()
+            , chunkSize: 0 // or chunk size in bytes, eg: FileAPI.MB*.5 (html5)
+            , chunkUploadRetry: 0 // number of retries during upload chunks (html5)
+            , prepare: prepare
+            , fileprogress: function (evt) {
+                progressEventHandler(fileProgresses.get(currentFile.name), evt);
+            }
+            , filecomplete: withErrorCheck(filecomplete)
+            , progress: function (evt) {
+                progressEventHandler(totalProgress, evt);
+            }
+            , complete: withErrorCheck(complete)
+        });
+    };
+
+    function CancelUpload (realFiles) {
+        _.each(realFiles, function (file) {
+            uploadXHR.abort(file);
+        });
+        eventStream.trigger("uploadComplete");
+        // FileManager.file_progress.each(function (progress) {
+        //     progress.set('percent', 0);
+        // });
+    };
+
+    function DeleteWithConfirmation (realFiles, fileModels) {
+        function deleteFile (model) {
+            if(window.confirm(
+                "Are you sure you want to delete "+model.get("name")+"?")) {
+                    model.deleteRemote();
+            }
+        }
+        _.each(fileModels, deleteFile);
+    };
+
+    function DeleteRemoteFile (filename) {
+        $.post(serverURLs.api, {
+            _method: 'DELETE'
+            , name: filename
+        }
+        , function DeleteRequestCallback (response) {
+            fileModels.remove(fileModels.get(filename));
+        });
+    }
+
+    var eventStream = new Backbone.Wreqr.EventAggregator();
+
+    eventStream.on("uploadComplete", delayedBy(600, function () {
+        totalProgressView.$el.hide();
+        totalProgress.set('percent', 0);
+    }));
+    eventStream.on("filesAdded", function () {
+        totalProgressView.$el.show();
     });
 
-    return FileManager;
-})(Backbone, Marionette, jQuery, FileAPI);
+    // Our after-market Marionette Application constructor.
+    // The constructor shipped currently does not allow us to set ALL
+    // options, forcing us to call methods on the Application object
+    // after construction :(
+    function makeApplication (options) {
+        // omit the options we wish existed.
+        var known_options = _.omit(options, "regions", "initializers");
+
+        // Use the shipped constructor
+        var app = new Backbone.Marionette.Application(known_options); 
+
+        // now set those options using the provided methods
+        app.addRegions(options.regions);
+        _.each(options.initializers, sliceArgs(app.addInitializer, 0, 1), app);
+
+        return app;
+    };
+
+    // return a Marionette Application instance
+    return makeApplication({
+        serverURLs: serverURLs
+        , regions: {
+            mainRegion: '#main'
+        }
+        , Model: Model
+        , FileView: FileView            
+        , FilesView: FilesView
+        , ProgressView: ProgressView
+        , File: File
+        , Progress: Progress
+        , Progresses: Progresses
+        , events: {
+            'initialize:after': callWith(Backbone.history, "start", [])
+        }
+        , initializers: [
+            function MainInitializer () {
+                $.get(serverURLs.api, function (data) {
+                    console.log(data);
+                    fileModels.add(data);
+                });
+                var layout = new AppLayout();
+                this.mainRegion.show(layout);
+            }
+        ]        
+    });
+};

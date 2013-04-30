@@ -31,9 +31,10 @@ class ImageUpload(Image):
 
     def __init__(self,request):
         self.request = request
-        print '__init__'
         request.response.headers['Access-Control-Allow-Origin'] = '*'
         request.response.headers['Access-Control-Allow-Methods'] = 'OPTIONS, HEAD, GET, POST, PUT, DELETE'
+        print "incoming request"
+        # import pdb; pdb.set_trace()
 
     def validate(self, file):
         if file['size'] < MIN_FILE_SIZE:
@@ -56,7 +57,7 @@ class ImageUpload(Image):
         return self.request.route_url('view',name='thumbnails') + '/' + name
 
     def thumbnailpath(self,name):
-        return os.path.join(request.registry.settings['scribe.users_path'], 'thumbnails', name)
+        return os.path.join(self.request.registry.settings['scribe.users_path'], 'thumbnails', name)
 
     def createthumbnail(self,filename):
         from PIL import Image
@@ -97,27 +98,31 @@ class ImageUpload(Image):
             return self.fileinfo(p)
         else:
             filelist = []
-            for f in os.listdir(os.path.join('pyramid_file_manager',*IMAGEPATH)):
+            for f in os.listdir(self.imagepath("")):
                 n = self.fileinfo(f)
                 if n:
+                    n['uploaded'] = True
                     print "n:",n
                     filelist.append(n)
             return filelist
 
     @view_config(request_method='DELETE', xhr=True, accept="application/json", renderer='json')
     def delete(self):
-        import json
-        filename = self.request.matchdict.get('name')
+        filename = self.request.POST.get('name')
+        print 'delete',filename
         try:
             os.remove(self.imagepath(filename) + '.type')
+            print 'deleted image type info'
         except IOError:
             pass
         try:
             os.remove(self.thumbnailpath(filename))
+            print 'deleted image thumbnail'
         except IOError:
             pass
         try:
             os.remove(self.imagepath(filename))
+            print 'deleted image'
         except IOError:
             return False
         return True
@@ -142,7 +147,9 @@ class ImageUpload(Image):
     def post(self):
         from pprint import pprint
 
-        if self.request.matchdict.get('_method') == "DELETE":
+        print 'self.request.POST:',
+        pprint (self.request.POST)
+        if self.request.POST.get('_method') == "DELETE":
             return self.delete()
 
         # If this is a chunked upload there will be no POST/form variables, 

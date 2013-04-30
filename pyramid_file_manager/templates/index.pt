@@ -35,12 +35,12 @@
     </script>
     <script type='text/javascript' src="${request.static_url('pyramid_file_manager:static/lib/FileAPI.min.js')}"></script>
     <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/backbone.file-manager-app.js')}"></script>
-    <script type="text/Javascript">
-        FileManager.addInitializer(function(){
-            var controller = new FileManager.Controller();
-            controller.start();
-        });
-    </script>
+    <!-- <script type="text/Javascript"> -->
+    <!--     FileManager.addInitializer(function(){ -->
+    <!--         var controller = new FileManager.Controller(); -->
+    <!--         controller.start(); -->
+    <!--     }); -->
+    <!-- </script> -->
   </head>
   <body>
       <noscript>Javascript must be enabled for the correct page display</noscript>
@@ -81,7 +81,12 @@
           </table>
       </script>
       <script type="text/x-mustache" id="file-template">      
+          {{^uploaded}}
           <td class="preview"></td>
+          {{/uploaded}}
+          {{#uploaded}}
+          <td><a class='preview' href='{{url}}'></a></td>
+          {{/uploaded}}
           <td class="name"><span>{{name}}<span></td>
           <td class="size"><span>{{size}}</span></td>
           {{#error}}

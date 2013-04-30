@@ -83,6 +83,7 @@ form {
 }
 
 .preview {
+    display: block;
     max-height: 20em;
     max-width: 15em;
 }
