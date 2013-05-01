@@ -14,5 +14,6 @@ def main(global_config, **settings):
     config.add_route('upload', '/server/php{sep:/*}{name:.*}')
     # retrieving images
     config.add_route('view', '/image/{name:.+}')
+    config.include('pyramid_file_manager.assets')
     config.scan()
     return config.make_wsgi_app()

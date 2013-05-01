@@ -10,18 +10,19 @@
     <link rel="icon" 
             type="image/png" 
             href="img/icon.png"></link>
-    <link href="${request.static_url('pyramid_file_manager:static/css/index.css')}" rel="stylesheet" media="all">
-    <link href="${request.static_url('pyramid_file_manager:static/css/file_manager.css')}" rel="stylesheet" media="all">
-    <link href="${request.static_url('pyramid_file_manager:static/css/bootstrap.min.css')}" rel="stylesheet" media="all">
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/jquery.min.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/load-image.min.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/bootstrap.min.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/bootstrap-transition.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/underscore.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/backbone.marionette.latest.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/hogan-3.0.0.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/lib/crc32.js')}"></script>
+    % for url in webassets(request, 'cascading_style_sheets'):
+    <link rel='stylesheet' href='${url}' media='all' />
+    % endfor
+    % for CSS_file_name in [ \
+        'index.css',         \
+        'file_manager.css',  \
+        'bootstrap.min.css', \
+        ]:
+    <link rel='stylesheet' media='all' href='${request.static_url("pyramid_file_manager:static/css/%s" % CSS_file_name)}' />
+    % endfor
+
+
+
     <script type="text/javascript">
         var FileAPI = {
             // @required
@@ -30,14 +31,19 @@
         
         var baseURL = '${request.route_url("index")}';
     </script>
-    <script type='text/javascript' src="${request.static_url('pyramid_file_manager:static/lib/FileAPI.min.js')}"></script>
-    <script type="text/javascript" src="${request.static_url('pyramid_file_manager:static/backbone.file-manager-app.js')}"></script>
-    <!-- <script type="text/Javascript"> -->
-    <!--     FileManager.addInitializer(function(){ -->
-    <!--         var controller = new FileManager.Controller(); -->
-    <!--         controller.start(); -->
-    <!--     }); -->
-    <!-- </script> -->
+
+    % for JS_file_name in [ \
+        'jquery.min.js',    \
+        'underscore.js',    \
+        'backbone.js',      \
+        'backbone.marionette.js', \
+        'hogan-3.0.0.js',   \
+        'FileAPI.min.js',   \
+    ]:
+    <script type='text/javascript' src='${request.static_url("pyramid_file_manager:static/lib/%s" % JS_file_name)}'></script>
+    % endfor
+    <script type='text/javascript' src='${request.static_url("pyramid_file_manager:static/backbone.marionette.app.js")}'></script>
+
   </head>
   <body>
       <noscript>Javascript must be enabled for the correct page display</noscript>

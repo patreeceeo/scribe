@@ -1,13 +1,12 @@
 from pyramid.view import view_config, view_defaults
-
 from pyramid.exceptions import NotFound
-
 import re, os, shutil
+import io
 
 
 # Replace server/php/ in imageupload.pt with tal:attributes="action actionurl"
 # to keep urls consistant
-@view_config(route_name='index',request_method='GET', renderer='templates/index.pt')
+@view_config(route_name='index',request_method='GET', renderer='pyramid_file_manager:templates/index.mako')
 def imageupload(request):
     return {'actionurl':request.route_url('upload',sep='',name='')}
 
@@ -15,7 +14,6 @@ MIN_FILE_SIZE = 1 # bytes
 MAX_FILE_SIZE = 5000000 # bytes
 IMAGE_TYPES = re.compile('image/(gif|p?jpeg|(x-)?png)')
 ACCEPT_FILE_TYPES = IMAGE_TYPES
-THUMBNAIL_SIZE = 80
 EXPIRATION_TIME = 300 # seconds
 # change the following to POST if DELETE isn't supported by the webserver
 DELETEMETHOD='DELETE'
@@ -24,8 +22,6 @@ class Image:
     def imagepath(self, name):
         return os.path.join(self.request.registry.settings['scribe.users_path'], name)
 
-import io
-total_file_contents = ""
 @view_defaults(route_name='upload')
 class ImageUpload(Image):
 
@@ -53,20 +49,6 @@ class ImageUpload(Image):
         file.seek(0) # Reset the file position to the beginning
         return size
 
-    # def thumbnailurl(self,name):
-    #     return self.request.route_url('view',name='thumbnails') + '/' + name
-
-    # def thumbnailpath(self,name):
-    #     return os.path.join(self.request.registry.settings['scribe.users_path'], 'thumbnails', name)
-
-    # def createthumbnail(self,filename):
-    #     from PIL import Image
-    #     import Image
-    #     image = Image.open( self.imagepath(filename) )
-    #     timage = image.resize( (THUMBNAIL_SIZE, THUMBNAIL_SIZE), Image.ANTIALIAS)        
-    #     timage.save( self.thumbnailpath(filename) )
-    #     return
-
     def fileinfo(self,name):
         filename = self.imagepath(name) 
         f, ext = os.path.splitext(name)
@@ -75,7 +57,6 @@ class ImageUpload(Image):
             info['name'] = name
             info['size'] = os.path.getsize(filename)
             info['url'] = self.request.route_url('view',name=name)
-            # info['thumbnail_url'] = self.thumbnailurl(name)
             info['delete_type'] = DELETEMETHOD
             info['delete_url'] = self.request.route_url('upload',sep='',name='') + '/' + name
             if DELETEMETHOD != 'DELETE':
@@ -116,11 +97,6 @@ class ImageUpload(Image):
             print 'deleted image type info'
         except IOError:
             pass
-        # try:
-        #     os.remove(self.thumbnailpath(filename))
-        #     print 'deleted image thumbnail'
-        # except IOError:
-        #     pass
         try:
             os.remove(self.imagepath(filename))
             print 'deleted image'
@@ -184,7 +160,6 @@ class ImageUpload(Image):
                     f.write(result['type'])
                 with open( self.imagepath(result['name']), 'w') as f:
                     shutil.copyfileobj( fieldStorage.file , f)
-                # self.createthumbnail(result['name'])
 
                 result['delete_type'] = DELETEMETHOD
                 result['delete_url'] = self.request.route_url('upload',sep='',name='') + '/' + result['name']
@@ -192,11 +167,6 @@ class ImageUpload(Image):
                 print 'url', result['url']
                 if DELETEMETHOD != 'DELETE':
                     result['delete_url'] += '&_method=DELETE'
-                # if (IMAGE_TYPES.match(result['type'])):
-                #     try:
-                #         result['thumbnail_url'] = self.thumbnailurl(result['name'])
-                #     except: # Could not get an image serving url
-                #         pass
             results.append(result)
         pprint(results)
         return results
